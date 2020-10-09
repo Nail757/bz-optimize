@@ -4,7 +4,7 @@
 //Plugin Name: BZ Optimize
 //Plugin URI: https://github.com/Nail757/bz-optimize
 //Description: Conditionally defer or remove chosen scripts and styles.
-//Version: 1.01
+//Version: 1.05
 //Author: Boris Zhuk
 //Author URI: http://t.me/b_zhuk
 //GitHub Plugin URI: https://github.com/Nail757/bz-optimize
@@ -404,8 +404,8 @@ class BZOptimize_front {
 		add_action( 'wp_enqueue_scripts', array($this, 'dequeue'), 100 );
 		add_filter( 'style_loader_tag', array($this, 'defer_styles'), 1, 4 );
 		add_filter('script_loader_tag', array($this, 'defer_scripts'), 1, 2);
-		add_action('wp_footer', array($this, 'footer_load'), 1 );
-	}
+		add_action('wp_footer', array($this, 'footer_load'), 99 );
+		}
 
 	public function defer_styles($html, $handle, $href, $media) {
 		$replaced = false;
@@ -517,7 +517,7 @@ class BZOptimize_front {
 			document.body.append(nNode);
 			
 			//deferred scripts SRC
-			if(bz_opt_deferred_scripts){
+			if(typeof bz_opt_deferred_scripts !== undefined){
 				console.log('deferred scripts: ',bz_opt_deferred_scripts);
 				for(sid in bz_opt_deferred_scripts){
 					var scriptTag = document.createElement('script');
@@ -528,7 +528,7 @@ class BZOptimize_front {
 				}
 			}
 		};
-		window.addEventListener('load', function() { 
+		window.addEventListener('load', function() {
 			if(requestAnimationFrame)
 					requestAnimationFrame(loadDeferredStyles);
 				else 
