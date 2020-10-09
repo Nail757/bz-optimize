@@ -4,7 +4,7 @@
 //Plugin Name: BZ Optimize
 //Plugin URI: https://github.com/Nail757/bz-optimize
 //Description: Conditionally defer or remove chosen scripts and styles.
-//Version: 1.01
+//Version: 1.05
 //Author: Boris Zhuk
 //Author URI: http://t.me/b_zhuk
 //GitHub Plugin URI: https://github.com/Nail757/bz-optimize
