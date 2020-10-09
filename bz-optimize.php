@@ -4,7 +4,7 @@
 //Plugin Name: BZ Optimize
 //Plugin URI: https://github.com/Nail757/bz-optimize
 //Description: Conditionally defer or remove chosen scripts and styles.
-//Version: 1.05
+//Version: 1.01
 //Author: Boris Zhuk
 //Author URI: http://t.me/b_zhuk
 //GitHub Plugin URI: https://github.com/Nail757/bz-optimize
@@ -426,7 +426,8 @@ class BZOptimize_front {
 			}
 		}
 		
-		if(bz_opt_strposa($href, $this->get_checklist('defer_css'))!==false || bz_opt_strposa($handle, $this->get_checklist('defer_css'))!==false){	
+		$list = $this->get_checklist('defer_css');
+		if(bz_opt_strposa($href, $list)!==false || bz_opt_strposa($handle, $list)!==false){	
 			$this->deferred_styles .= $html;
 			$html = "";
 		}else if(!$replaced){
@@ -440,8 +441,8 @@ class BZOptimize_front {
 
 	//SCRIPTS DEFER
 	public function defer_scripts($tag, $handle) {
-		
-		if(bz_opt_strposa($tag, $this->get_checklist('defer_js'))!==false){
+		$list = $this->get_checklist('defer_js');
+		if(bz_opt_strposa($handle, $list)!==false || bz_opt_strposa($tag, $list)!==false){
 			$this->deferred_scripts[$handle] = explode("'", explode('src',$tag)[1])[1];
 			return '';
 		}
