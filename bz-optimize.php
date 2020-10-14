@@ -4,7 +4,7 @@
 //Plugin Name: BZ Optimize
 //Plugin URI: https://github.com/Nail757/bz-optimize
 //Description: Conditionally defer or remove chosen scripts and styles.
-//Version: 1.05
+//Version: 1.07
 //Author: Boris Zhuk
 //Author URI: http://t.me/b_zhuk
 //GitHub Plugin URI: https://github.com/Nail757/bz-optimize
@@ -32,8 +32,13 @@ class BZOptimize {
 		$this->bz_optimize_options = get_option( 'bz_optimize_option_name' ); ?>
 		<script>
 		jQuery(document).ready(($)=>{
+			let prev = null;
 			$('form>h2').each((i,el)=>{
 				$(el).attr('data-id', i);
+				if(i>0){
+					$(el).insertAfter(prev);
+				}
+				prev = el;
 			});
 			$('.form-table').hide();
 			$('.form-table').eq(0).show();
@@ -47,6 +52,8 @@ class BZOptimize {
 			form>h2{
 				text-decoration:underline;
 				cursor: pointer;
+				display:inline-block;
+				margin-right:2rem;
 			}
 			.form-table b{
 				font-weight:900;
@@ -89,7 +96,7 @@ class BZOptimize {
 		
 		add_settings_section(
 			'bz_optimize_setting_section_replace', // id
-			'Replace', // title
+			'Custom', // title
 			array( $this, 'bz_optimize_section_info_replace' ), // callback
 			'bz-optimize-admin' // page
 		);
@@ -118,22 +125,6 @@ class BZOptimize {
 		);
 		
 		add_settings_field(
-			'scripts_onscroll', // id
-			'<b>JS</b> code to run on first SCROLL<br>(plain <b>JS</b> here, no tags)', // title
-			array( $this, 'scripts_onscroll_callback' ), // callback
-			'bz-optimize-admin', // page
-			'bz_optimize_setting_section' // section
-		);
-		
-		add_settings_field(
-			'custom_code', // id
-			'Custom <b>JS</b> code to defer<br>(plain <b>JS</b> here, no tags)', // title
-			array( $this, 'custom_code_callback' ), // callback
-			'bz-optimize-admin', // page
-			'bz_optimize_setting_section' // section
-		);
-		
-		add_settings_field(
 			'defer_all_scripts_2', // id
 			'defer_all_scripts', // title
 			array( $this, 'defer_all_scripts_2_callback' ), // callback
@@ -145,14 +136,45 @@ class BZOptimize {
 		
 		add_settings_field(
 			'replace_styles', // id
-			'Replace <b>CSS</b> files<br>(id or url part)', // title
+			'Replace <b>CSS</b> files<br>The format is:<br><code>$keyword url_or_css</code>', // title
 			array( $this, 'replace_styles_callback'), // callback
 			'bz-optimize-admin', // page
 			'bz_optimize_setting_section_replace' // section
 		);
 		
-		//Section 3
+		add_settings_field(
+			'scripts_onscroll', // id
+			'<b>JS</b> code to run on first SCROLL, TOUCH or CLICK<br>(plain <b>JS</b> here, no tags)', // title
+			array( $this, 'scripts_onscroll_callback' ), // callback
+			'bz-optimize-admin', // page
+			'bz_optimize_setting_section_replace' // section
+		);
 		
+		add_settings_field(
+			'custom_code', // id
+			'Custom <b>JS</b> code to defer<br>(plain <b>JS</b> here, no tags)', // title
+			array( $this, 'custom_code_callback' ), // callback
+			'bz-optimize-admin', // page
+			'bz_optimize_setting_section_replace' // section
+		);
+		
+		add_settings_field(
+			'custom_code_delay', // id
+			'Custom <b>JS</b> delay after load event (ms)', // title
+			array( $this, 'custom_code_delay_callback' ), // callback
+			'bz-optimize-admin', // page
+			'bz_optimize_setting_section_replace' // section
+		);
+		
+		add_settings_field(
+			'custom_code_onscroll', // id
+			'Custom code on first interaction too', // title
+			array( $this, 'custom_code_onscroll_callback' ), // callback
+			'bz-optimize-admin', // page
+			'bz_optimize_setting_section_replace' // section
+		);
+		
+		//Section 3
 		add_settings_field(
 			'styles_3', // id
 			'<b>CSS</b> to remove<br>[must match link tag\'s id]', // title
@@ -208,8 +230,20 @@ class BZOptimize {
 			$sanitary_values['custom_code'] = esc_textarea( $input['custom_code'] );
 		}
 		
+		if ( isset( $input['custom_code_delay'] ) ) {
+			$sanitary_values['custom_code_delay'] = $input['custom_code_delay'];
+		}
+		
+		if ( isset( $input['custom_code_onscroll'] ) ) {
+			$sanitary_values['custom_code_onscroll'] = $input['custom_code_onscroll'];
+		}
+		
 		if ( isset( $input['replace_styles'] ) ) {
 			$sanitary_values['replace_styles'] = esc_textarea( $input['replace_styles'] );
+		}
+		
+		if ( isset( $input['emoji'] ) ) {
+			$sanitary_values['emoji'] = $input['emoji'];
 		}
 
 		return $sanitary_values;
@@ -220,7 +254,7 @@ class BZOptimize {
 	}
 	
 	public function bz_optimize_section_info_replace() {
-		echo '<p>Print styles you want to replace with your own.<br>The format is:<code>$keyword url_or_css</code></p>';
+		//echo '<p>Print styles you want to replace with your own.<br>The format is:<code>$keyword url_or_css</code></p>';
 	}
 	
 	public function bz_optimize_section_info_remove() {
@@ -258,7 +292,7 @@ class BZOptimize {
 	public function emoji_callback() {
 		printf(
 			'<input type="checkbox" name="bz_optimize_option_name[emoji]" id="emoji" value="emoji" %s> <label for="emoji">I DO Need Emoji</label>',
-			( isset( $this->bz_optimize_options['emoji'] ) && $this->bz_optimize_options['emoji'] === true ) ? 'checked' : ''
+			( isset( $this->bz_optimize_options['emoji'] ) && $this->bz_optimize_options['emoji'] === 'emoji' ) ? 'checked' : ''
 		);
 	}
 	
@@ -280,6 +314,18 @@ class BZOptimize {
 		printf(
 			'<textarea class="large-text" rows="10" name="bz_optimize_option_name[custom_code]" id="custom_code">%s</textarea>',
 			isset( $this->bz_optimize_options['custom_code'] ) ? esc_attr( $this->bz_optimize_options['custom_code']) : ''
+		);
+	}
+	public function custom_code_delay_callback() {
+		printf(
+			'<input type="number" class="large-input" name="bz_optimize_option_name[custom_code_delay]" id="custom_code_delay" value="%s"></input>',
+			isset( $this->bz_optimize_options['custom_code_delay'] ) ? esc_attr( $this->bz_optimize_options['custom_code_delay']) : ''
+		);
+	}
+	public function custom_code_onscroll_callback() {
+		printf(
+			'<input type="checkbox" name="bz_optimize_option_name[custom_code_onscroll]" id="custom_code_onscroll" value="custom_code_onscroll" %s> <label for="custom_code_onscroll">Run custom code on first interaction (scroll, click, touch)</label>',
+			( isset( $this->bz_optimize_options['custom_code_onscroll'] ) && $this->bz_optimize_options['custom_code_onscroll'] === 'custom_code_onscroll' ) ? 'checked' : ''
 		);
 	}
 	
@@ -312,7 +358,7 @@ function bz_opt_strposa($haystack, $needle, $offset=0) {
 	
 	//Front-end script
 class BZOptimize_front {
-	
+	public $opts = null;
 	public $list = array();
 	public $custom_code = false;
 	public $onscroll_code = false;
@@ -372,6 +418,8 @@ class BZOptimize_front {
 	
 	public function __construct() {
 		$opts = get_option( 'bz_optimize_option_name' ); // Array of All Options
+		
+		$this->opts = $opts;
 		
 		$styles_0 = isset($opts['styles_0']) ? bz_opt_normalize($opts['styles_0']) : ''; // styles
 		$scripts_1 = isset($opts['scripts_1']) ? bz_opt_normalize($opts['scripts_1']) : ''; // scripts
@@ -456,15 +504,26 @@ class BZOptimize_front {
 
 	public function footer_load(){
 		if($this->custom_code){
-			echo '<noscript data-load="defer" data-type="script">';
+			$delay = $this->opts['custom_code_delay'];
+			if($delay AND $delay>0)
+				$delay = 'data-delay="'.$delay.'"';
+			
+			$scroll = $this->opts['custom_code_onscroll'];
+			if($scroll)
+				$scroll = 'data-load="scroll"';
+			
+			echo '<noscript id="bz_custom_code" '.$scroll.' '.$delay.'>';
+			echo 'if(!window.bz_custom_code_loaded){';
 			echo html_entity_decode($this->custom_code);
+			echo '}
+			window.bz_custom_code_loaded = true;';
 			echo '</noscript>';
 		}
+		
 		echo '<noscript data-load="defer">';
 		if($this->deferred_styles !== ''){
 			echo $this->deferred_styles;
 		}
-		
 		echo '</noscript>';
 		
 		if($this->onscroll_code){
@@ -483,11 +542,13 @@ class BZOptimize_front {
 		?>
 		
 		<script>
-		let addScript = (dataNode)=>{
-			let newScript = document.createElement("script");
-			let inlineScript = document.createTextNode(dataNode.textContent);
-			newScript.appendChild(inlineScript); 
-			document.body.appendChild(newScript);
+		let doc = document;
+		let addScript = (n)=>{
+			console.log('addScript -> ',n.id);
+			let el = doc.createElement("script");
+			let s = doc.createTextNode(n.textContent);
+			el.appendChild(s); 
+			doc.body.appendChild(el);
 		}
 		let addStyle = (el, par)=>{
 			let val = el.textContent;
@@ -498,60 +559,75 @@ class BZOptimize_front {
 			par.innerHTML += val;
 		}
 		
-		let nNode = document.createElement('div');
+		let nNode = doc.createElement('div');
 		var loadDeferredStyles = function() {
-			var addStylesNode = document.querySelectorAll("noscript[data-load='defer']");
+			var addStylesNode = doc.querySelectorAll("noscript[data-load='defer']");
 			
 			nNode.classList.add('bz-defer-loaded');
 			addStylesNode.forEach(
 			(el)=>{
-				if(el.getAttribute('data-type') === 'script'){
-					addScript(el);
-				}else{
-					let timer = el.getAttribute('data-delay');
-					if(timer)
-						setTimeout(addStyle, timer, el,nNode)
-					else
-						addStyle(el, nNode);
-				}
+				let timer = el.getAttribute('data-delay');
+				if(timer)
+					setTimeout(addStyle, timer, el,nNode)
+				else
+					addStyle(el, nNode);
 			});
-			document.body.append(nNode);
+			doc.body.append(nNode);
 			
 			//deferred scripts SRC
 			if(typeof bz_opt_deferred_scripts !== undefined){
 				console.log('deferred scripts: ',bz_opt_deferred_scripts);
 				for(sid in bz_opt_deferred_scripts){
-					var scriptTag = document.createElement('script');
-					scriptTag.id = sid;
-					scriptTag.defer = 'defer';
-					scriptTag.src = bz_opt_deferred_scripts[sid];
-					document.body.appendChild(scriptTag);
+					var tg = doc.createElement('script');
+					tg.id = sid;
+					tg.defer = 'defer';
+					tg.src = bz_opt_deferred_scripts[sid];
+					doc.body.appendChild(tg);
 				}
 			}
+			
+			//custom code
+			ccode = doc.getElementById('bz_custom_code');
+			if(ccode){
+				let timer = ccode.getAttribute('data-delay') || 0;
+				setTimeout(addScript, timer, ccode);
+			}
 		};
+		
+		let goNext = (f)=>{
+			if(typeof requestAnimationFrame !== undefined)
+				requestAnimationFrame(f);
+			else 
+				setTimeout(f, 10); 
+		}
+		
 		window.addEventListener('load', function() {
-			if(requestAnimationFrame)
-					requestAnimationFrame(loadDeferredStyles);
-				else 
-					window.setTimeout(loadDeferredStyles, 10); 
+			goNext(loadDeferredStyles);
 		});
 		
+		//on scroll/click/touch
 		let addScrollNodes = () => {
 			console.log('on scroll load -> ');
-			let scrollNodes = document.querySelectorAll("noscript[data-load='scroll']");
-			scrollNodes.forEach((el)=>{
+			let sn = doc.querySelectorAll("noscript[data-load='scroll']");
+			sn.forEach((el)=>{
+				console.log(el.id);
 				addScript(el);
 			});
 		}
+		
 		let bz_first_scroll = true;
 		let on_fst_scroll = () => {
 			if (bz_first_scroll) {
 				bz_first_scroll = false;
+				goNext(addScrollNodes);
 				window.removeEventListener('scroll', on_fst_scroll);
-				setTimeout(addScrollNodes, 1000);
+				doc.removeEventListener('click', on_fst_scroll);
+				doc.removeEventListener('touchstart', on_fst_scroll);
 			}
 		};
 		window.addEventListener('scroll', on_fst_scroll);
+		doc.addEventListener('click', on_fst_scroll);
+		doc.addEventListener('touchstart', on_fst_scroll);
 		</script>
 	<?php
 	}
