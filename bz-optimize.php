@@ -4,7 +4,7 @@
 Plugin Name: BZ Optimize
 Plugin URI: https://github.com/Nail757/bz-optimize
 Description: Conditionally defer or remove chosen scripts and styles.
-Version: 1.07
+Version: 1.10
 Author: Boris Zhuk
 Author URI: http://t.me/b_zhuk
 GitHub Plugin URI: https://github.com/Nail757/bz-optimize
@@ -86,7 +86,7 @@ class BZOptimize {
 			'bz_optimize_option_name', // option_name
 			array( $this, 'bz_optimize_sanitize' ) // sanitize_callback
 		);
-
+		
 		add_settings_section(
 			'bz_optimize_setting_section', // id
 			'Defer', // title
@@ -108,6 +108,8 @@ class BZOptimize {
 			'bz-optimize-admin' // page
 		);
 
+		// Section 1 - DEFER
+		
 		add_settings_field(
 			'styles_0', // id
 			'<b>CSS</b> Files to defer until page load<br>(id or url part)', // title
@@ -132,7 +134,15 @@ class BZOptimize {
 			'bz_optimize_setting_section' // section
 		);
 		
-		//Section 2
+		add_settings_field(
+			'scripts_nodefer', // id
+			'<b>JS</b> Files to NOT add "defer" attribute<br>only jQuery if empty', // title
+			array( $this, 'scripts_nodefer_callback' ), // callback
+			'bz-optimize-admin', // page
+			'bz_optimize_setting_section' // section
+		);
+		
+		//Section 2 - REPLACE
 		
 		add_settings_field(
 			'replace_styles', // id
@@ -198,6 +208,14 @@ class BZOptimize {
 			'bz-optimize-admin', // page
 			'bz_optimize_setting_section_remove' // section
 		);
+		
+		add_settings_field(
+			'rem_actions', // id
+			'<b>PHP Actions</b> to remove<br><code>@hook action</code>', // title
+			array( $this, 'rem_actions_callback' ), // callback
+			'bz-optimize-admin', // page
+			'bz_optimize_setting_section_remove' // section
+		);
 	}
 
 	public function bz_optimize_sanitize($input) {
@@ -208,6 +226,10 @@ class BZOptimize {
 
 		if ( isset( $input['scripts_1'] ) ) {
 			$sanitary_values['scripts_1'] = esc_textarea( $input['scripts_1'] );
+		}
+		
+		if ( isset( $input['scripts_nodefer'] ) ) {
+			$sanitary_values['scripts_nodefer'] = esc_textarea( $input['scripts_nodefer'] );
 		}
 		
 		if ( isset( $input['scripts_onscroll'] ) ) {
@@ -245,6 +267,10 @@ class BZOptimize {
 		if ( isset( $input['emoji'] ) ) {
 			$sanitary_values['emoji'] = $input['emoji'];
 		}
+		
+		if ( isset( $input['rem_actions'] ) ) {
+			$sanitary_values['rem_actions'] = esc_textarea( $input['rem_actions'] );
+		}
 
 		return $sanitary_values;
 	}
@@ -272,6 +298,13 @@ class BZOptimize {
 		printf(
 			'<textarea class="large-text" rows="5" name="bz_optimize_option_name[scripts_1]" id="scripts_1">%s</textarea>',
 			isset( $this->bz_optimize_options['scripts_1'] ) ? esc_attr( $this->bz_optimize_options['scripts_1']) : ''
+		);
+	}
+	
+	public function scripts_nodefer_callback() {
+		printf(
+			'<textarea class="large-text" rows="5" name="bz_optimize_option_name[scripts_nodefer]" id="scripts_nodefer">%s</textarea>',
+			isset( $this->bz_optimize_options['scripts_nodefer'] ) ? esc_attr( $this->bz_optimize_options['scripts_nodefer']) : ''
 		);
 	}
 	
@@ -333,6 +366,13 @@ class BZOptimize {
 		printf(
 			'<textarea class="large-text" rows="10" name="bz_optimize_option_name[replace_styles]" id="replace_styles">%s</textarea>',
 			isset( $this->bz_optimize_options['replace_styles'] ) ? esc_attr( $this->bz_optimize_options['replace_styles']) : ''
+		);
+	}
+	
+	public function rem_actions_callback() {
+		printf(
+			'<textarea class="large-text" rows="3" name="bz_optimize_option_name[rem_actions]" id="rem_actions">%s</textarea>',
+			isset( $this->bz_optimize_options['rem_actions'] ) ? esc_attr( $this->bz_optimize_options['rem_actions']) : ''
 		);
 	}
 
@@ -423,12 +463,15 @@ class BZOptimize_front {
 		
 		$styles_0 = isset($opts['styles_0']) ? bz_opt_normalize($opts['styles_0']) : ''; // styles
 		$scripts_1 = isset($opts['scripts_1']) ? bz_opt_normalize($opts['scripts_1']) : ''; // scripts
+		$scripts_nodefer = isset($opts['scripts_nodefer']) ? bz_opt_normalize($opts['scripts_nodefer']) : bz_opt_normalize('jquery'); // scripts
 		$styles_3 = isset($opts['styles_3']) ? bz_opt_normalize($opts['styles_3']) : ''; // styles
 		$scripts_4 = isset($opts['scripts_4']) ? bz_opt_normalize($opts['scripts_4']) : ''; // scripts
 		//$defer_all_scripts_2 = $opts['defer_all_scripts_2']; // defer_all_scripts
+		
 	 
 		$this->decode('defer_css', $styles_0);
 		$this->decode('defer_js', $scripts_1);
+		$this->decode('nodefer_js', $scripts_nodefer);
 		$this->decode('kill_css', $styles_3);
 		$this->decode('kill_js', $scripts_4);
 		
@@ -453,7 +496,22 @@ class BZOptimize_front {
 		add_filter( 'style_loader_tag', array($this, 'defer_styles'), 1, 4 );
 		add_filter('script_loader_tag', array($this, 'defer_scripts'), 1, 2);
 		add_action('wp_footer', array($this, 'footer_load'), 99 );
+		
+			if(isset($opts['rem_actions'])){
+				add_action('init', array($this, 'rem_actions'));
+			}
 		}
+		
+	public function rem_actions(){
+		$ini_str = bz_opt_normalize($this->opts['rem_actions']);
+		$ini_arr = explode("@", $ini_str);
+		foreach($ini_arr as $act){
+			if($act !== ''){
+				$data = explode(' ', $act);
+				remove_action( $data[0], $data[1]);
+			}
+		}
+	}
 
 	public function defer_styles($html, $handle, $href, $media) {
 		$replaced = false;
@@ -496,7 +554,8 @@ class BZOptimize_front {
 		}
 		
 		//dont defer jquery 
-		if(strpos($handle, 'jquery')!==false) 
+		$ignore_list = $this->get_checklist('nodefer_js');
+		if(bz_opt_strposa($handle, $ignore_list)!==false || bz_opt_strposa($tag, $ignore_list)!==false)
 			return $tag;
 		else
 			return str_replace( ' src', ' defer="defer" src', $tag );
@@ -533,7 +592,7 @@ class BZOptimize_front {
 		}
 		
 		if(!empty($this->deferred_scripts)){
-			echo '<script>const bz_opt_deferred_scripts = {';
+			echo '<script>window.bz_opt_deferred_scripts = {';
 			foreach($this->deferred_scripts as $id => $src){
 				echo '"'.$id.'":"'.$src.'",';
 			}
@@ -544,11 +603,16 @@ class BZOptimize_front {
 		<script>
 		let doc = document;
 		let addScript = (n)=>{
-			console.log('addScript -> ',n.id);
+			console.log('addScript -> ', n);
+			let src = n.getAttribute('data-src');
 			let el = doc.createElement("script");
-			let s = doc.createTextNode(n.textContent);
-			el.appendChild(s); 
-			doc.body.appendChild(el);
+			if(src)
+				el.src = src;
+			else{
+				let s = doc.createTextNode(n.textContent);
+				el.appendChild(s);
+			}
+			n.parentNode.insertBefore(el,n);
 		}
 		let addStyle = (el, par)=>{
 			let val = el.textContent;
@@ -560,23 +624,24 @@ class BZOptimize_front {
 		}
 		
 		let nNode = doc.createElement('div');
-		var loadDeferredStyles = function() {
-			var addStylesNode = doc.querySelectorAll("noscript[data-load='defer']");
-			
 			nNode.classList.add('bz-defer-loaded');
-			addStylesNode.forEach(
+		
+		let loadDeferredStyles = function() {
+			let nds = doc.querySelectorAll("noscript[data-load='defer']");
+			nds.forEach(
 			(el)=>{
+				let func = (el.getAttribute('data-type') === 'script') ? addScript : addStyle;
 				let timer = el.getAttribute('data-delay');
 				if(timer)
-					setTimeout(addStyle, timer, el,nNode)
+					setTimeout(func, timer, el, nNode)
 				else
-					addStyle(el, nNode);
+					func(el, nNode);
 			});
 			doc.body.append(nNode);
 			
 			//deferred scripts SRC
-			if(typeof bz_opt_deferred_scripts !== undefined){
-				console.log('deferred scripts: ',bz_opt_deferred_scripts);
+			if(window.bz_opt_deferred_scripts){
+				console.log('deferred scripts: ', window.bz_opt_deferred_scripts);
 				for(sid in bz_opt_deferred_scripts){
 					var tg = doc.createElement('script');
 					tg.id = sid;
@@ -595,9 +660,9 @@ class BZOptimize_front {
 		};
 		
 		let goNext = (f)=>{
-			if(typeof requestAnimationFrame !== undefined)
+			if(typeof window.requestAnimationFrame !== undefined)
 				requestAnimationFrame(f);
-			else 
+			else
 				setTimeout(f, 10); 
 		}
 		
